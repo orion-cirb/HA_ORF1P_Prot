@@ -2,16 +2,17 @@ package HA_ORF1P_Tools;
 
 import HA_ORF1P_Tools.Cellpose.CellposeSegmentImgPlusAdvanced;
 import HA_ORF1P_Tools.Cellpose.CellposeTaskSettings;
-import HA_ORF1P_Tools.StardistOrion.StarDist2D;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.ImageStack;
 import ij.gui.Roi;
 import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
 import ij.plugin.RGBStackMerge;
+import ij.plugin.RoiEnlarger;
 import ij.plugin.filter.ThresholdToSelection;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -43,7 +44,6 @@ import mcib3d.geom2.measurementsPopulation.MeasurePopulationColocalisation;
 import mcib3d.geom2.measurementsPopulation.PairObjects3DInt;
 import mcib3d.image3d.ImageByte;
 import mcib3d.image3d.ImageHandler;
-import mcib3d.image3d.ImageInt;
 import mcib3d.image3d.processing.BinaryMorpho;
 import net.haesleinhuepf.clij.clearcl.ClearCLBuffer;
 import net.haesleinhuepf.clij2.CLIJ2;
@@ -70,15 +70,7 @@ public class Tools3D {
     public double minCellArea= 100;
     public double maxCellArea = 5000;
     
-    // StarDist
-    public File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
-    public String stardistModelNucleus = "StandardFluo.zip";
-    public Object syncObject = new Object();
-    public final double stardistPercentileBottom = 0.2;
-    public final double stardistPercentileTop = 99.8;
-    public final double stardistProbThreshNuc = 0.6;
-    public final double stardistOverlayThreshNuc = 0.25;
-    public String stardistOutput = "Label Image"; 
+  
     
     // Cellpose
     public int cellPoseCellsDiameter = 100;
@@ -113,20 +105,6 @@ public class Tools3D {
     }
     
     
-    /**
-     * Check that required StarDist models are present in Fiji models folder
-     */
-    public boolean checkStarDistModels() {
-        FilenameFilter filter = (dir, name) -> name.endsWith(".zip");
-        File[] modelList = modelsPath.listFiles(filter);
-        int index = ArrayUtils.indexOf(modelList, new File(modelsPath+File.separator+stardistModelNucleus));
-        if (index == -1) {
-            IJ.showMessage("Error", stardistModelNucleus + " StarDist model not found, please add it in Fiji models folder");
-            return false;
-        }
-        return true;
-    }
-
     
     /**
      * Find images in folder
@@ -219,8 +197,6 @@ public class Tools3D {
      */
     public String[] dialog(String[] channels) {     
         
-        if (!checkStarDistModels())
-            return(null);
         String[] channelsName = {"DAPI", "HA-ORF1P", "lamin", "Prot"}; 
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
         gd.setInsets​(0, 80, 0);
@@ -391,13 +367,17 @@ public class Tools3D {
      * Analyze skeleton
      * return branche and junction number
      */
-    private double[] AnalyzeSkeleton(ImagePlus img) {
+    private double[] AnalyzeSkeleton(ImagePlus img, ImageHandler imgLab, Cell cell) {
         AnalyzeSkeleton_ anaSkel = new AnalyzeSkeleton_();
-        anaSkel.calculateShortestPath = true;
         anaSkel.setup("",img);
         SkeletonResult skelResult = anaSkel.run(AnalyzeSkeleton_.NONE, true, true, img, true, false);
+        ImagePlus imgLabeledSkeletons = new ImagePlus("", anaSkel.getLabeledSkeletons());
+        ImageHandler segImage = ImageHandler.wrap(imgLabeledSkeletons);
+        segImage.setOffset(imgLab.offsetX - 4, imgLab.offsetY - 4,imgLab.offsetZ);
+        segImage.setCalibration(cal);
+        cell.setLaminSkel(new Object3DInt(segImage));
         int junctions = skelResult.getListOfJunctionVoxels().size();
-        int branches = skelResult.getBranches().length;
+        int branches = (junctions == 0) ? 0 : skelResult.getBranches().length;
         return(new double[] {branches, junctions});
     }
     
@@ -405,22 +385,25 @@ public class Tools3D {
      * Find lamin parameters
      * Get number of branches and junctions in lamin skeleton
      */
-    public double[] findLaminParams(ImagePlus img, Object3DInt nucObj) {
-        BoundingBox bbox = nucObj.getBoundingBox();
-        Roi roi = new Roi(bbox.xmin, bbox.ymin, bbox.xmax - bbox.xmin, bbox.ymax - bbox.ymin);
+    public double[] findLaminParams(ImagePlus img, Cell cell) {
+        ImageHandler labelImage = new Object3DIntLabelImage(cell.nucleus).getCroppedLabelImage();
+        BoundingBox bbox = cell.nucleus.getBoundingBox();
+        Roi roi = new Roi(bbox.xmin - 4, bbox.ymin - 4, (bbox.xmax - bbox.xmin) + 4, (bbox.ymax - bbox.ymin) + 4);
         img.setRoi(roi);
         ImagePlus imgCrop = new Duplicator().crop(img);
         imgCrop.deleteRoi();
-        ImagePlus imgLOG = LOG_filter(imgCrop, 6);
+        ImagePlus imgLOG = LOG_filter(imgCrop, 5);
         flush_close(imgCrop);
         ImagePlus imgBin = threshold(imgLOG, "Li");
         flush_close(imgLOG);
         // clearOutside nucleus
-        roi = computeRoi(nucObj);
-        clearOutSide(imgBin, roi);
+        roi = computeRoi(cell.nucleus);
+        // enlarge to 1 µm
+        Roi roiEnlarged = RoiEnlarger.enlarge(roi, 4);
+        clearOutSide(imgBin, roiEnlarged);
         ImagePlus imgSkel = clij_Skeletonize(imgBin);
         flush_close(imgBin);
-        double[] params = AnalyzeSkeleton(imgSkel);
+        double[] params = AnalyzeSkeleton(imgSkel, labelImage, cell);
         flush_close(imgSkel);
         return(params);
     } 
@@ -574,7 +557,6 @@ public class Tools3D {
                 imgSeg = min_filter(imgCrop, rad, 0);
                 break;
         }
-            
         ImageHandler segImage2 = ImageHandler.wrap(imgSeg);
         segImage2.setOffset(labelImage);
         segImage2.setCalibration(cal);
@@ -584,45 +566,6 @@ public class Tools3D {
         else
             objMorpho.setLabel(obj.getLabel());
         return objMorpho;
-    }
-
-    
-    /**
-     * Apply StarDist on 2D slice
-     * Label detections in 2D
-     * @return objects population
-     */
-    public Objects3DIntPopulation stardistDetection(ImagePlus img, Roi roi) throws IOException{
-        boolean resize = false;
-        ImagePlus imgDup = null;
-        if (img.getWidth() > 1024) {
-            float factor = 0.5f;
-            imgDup = img.resize((int)(img.getWidth()*factor), (int)(img.getHeight()*factor), "none");
-            resize = true;
-        } 
-        else
-            imgDup = new Duplicator().run(img);
-        
-        // StarDist
-        File starDistModelFile = new File(modelsPath+File.separator+stardistModelNucleus);
-        StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
-        star.loadInput(imgDup);
-        star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistProbThreshNuc, stardistOverlayThreshNuc, stardistOutput);
-        star.run();
-        imgDup.show();
-        ImagePlus imgLabels = (resize) ? star.getLabelImagePlus().resize(img.getWidth(), img.getHeight(), 1, "none") : star.getLabelImagePlus();        
-        flush_close(imgDup);
-        
-        if (roi != null)
-            clearOutSide(imgLabels, roi);
-        ImageInt label2D = ImageInt.wrap(imgLabels);
-        label2D.setCalibration(cal);
-        flush_close(imgLabels); 
-        Objects3DIntPopulation pop = new Objects3DIntPopulation(label2D);
-        System.out.println(pop.getNbObjects() + " nuclei found");
-        popFilterSize(pop, minNucArea, maxNucArea);
-        System.out.println(pop.getNbObjects() + " nuclei remaining after size filtering");
-        return(pop);
     }
     
     
@@ -688,38 +631,46 @@ public class Tools3D {
      * @param dotsPop
      */
     public void tagCells(ImagePlus imgProt, ImagePlus imgLamin, ArrayList<Cell> cellsPop) {
-        ImageHandler imh = ImageHandler.wrap(imgProt);
+        ImageHandler imh = (imgProt == null) ? null : ImageHandler.wrap(imgProt);
         System.out.println("Measuring nucleus parameters ...");
         for (Cell cell: cellsPop) {
-           
-            // Get nucleus parameters
-            double nucVol = new MeasureVolume(cell.nucleus).getVolumeUnit();
-            double nucComp = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.COMP_CORRECTED);
-            double nucSph = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.SPHER_CORRECTED);
-            double nucElongation = new MeasureEllipsoid(cell.nucleus).getValueMeasurement(MeasureEllipsoid.ELL_ELONGATION);
-            double nucFlatness = new MeasureEllipsoid(cell.nucleus).getValueMeasurement(MeasureEllipsoid.ELL_FLATNESS);
-            double nucInt = new MeasureIntensity(cell.nucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            
-            // Get inner nucleus parameters
-            double innerNucVol = new MeasureVolume(cell.innerNucleus).getVolumeUnit();
-            double innerNucInt = new MeasureIntensity(cell.innerNucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            
-            // Get inner ring parameters
-            double innerRingNucVol = new MeasureVolume(cell.innerRing).getVolumeUnit();
-            double innerRingNucInt = new MeasureIntensity(cell.innerRing, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            
-            // Get outer ring parameters
-            double outerRingVol = new MeasureVolume(cell.outerRing).getVolumeUnit();
-            double outerRingInt = new MeasureIntensity(cell.outerRing, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            
+           double nucInt = 0;
+           double innerNucArea = 0;
+           double innerNucInt = 0;
+           double innerRingNucArea = 0;
+           double innerRingNucInt = 0;
+           double outerRingArea = 0;
+           double outerRingInt = 0;
+           double nucArea = new MeasureVolume(cell.nucleus).getVolumeUnit();
+           double nucComp = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.COMP_CORRECTED);
+           double nucCirc = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.SPHER_CORRECTED);
+           double nucElongation = new MeasureEllipsoid(cell.nucleus).getValueMeasurement(MeasureEllipsoid.ELL_ELONGATION);
+           if (imgProt != null) {
+                // Get nucleus intensity parameter
+                nucInt = new MeasureIntensity(cell.nucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+
+                // Get inner nucleus parameters
+                innerNucArea = new MeasureVolume(cell.innerNucleus).getVolumeUnit();
+                innerNucInt = new MeasureIntensity(cell.innerNucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+
+                // Get inner ring parameters
+                innerRingNucArea = new MeasureVolume(cell.innerRing).getVolumeUnit();
+                innerRingNucInt = new MeasureIntensity(cell.innerRing, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+
+                // Get outer ring parameters
+                outerRingArea = new MeasureVolume(cell.outerRing).getVolumeUnit();
+                outerRingInt = new MeasureIntensity(cell.outerRing, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+           }
+
             // Get lamin parameters
-            double[] laminParams = findLaminParams(imgLamin, cell.nucleus);
+            double[] laminParams = findLaminParams(imgLamin, cell);
             
             // Add all parameters to cell
-            cell.setParams(cell.nucleus.getLabel(), nucVol, nucComp, nucSph, nucElongation, nucFlatness, nucInt, 
-                    innerNucVol, innerNucInt, innerRingNucVol, innerRingNucInt, outerRingVol, outerRingInt, laminParams[0], laminParams[1]);
+            cell.setParams(cell.nucleus.getLabel(), nucArea, nucComp, nucCirc, nucElongation, nucInt, innerNucArea, innerNucInt, innerRingNucArea, innerRingNucInt,
+                    outerRingArea, outerRingInt, laminParams[0], laminParams[1]);
         }
-        imh.closeImagePlus();
+        if (imgProt != null)
+            imh.closeImagePlus();
     }
         
     /**
@@ -754,42 +705,58 @@ public class Tools3D {
      * @param outDir
      * @param fontSize 
      */
-    public void drawResults(ArrayList<Cell> cellsPop, ImagePlus imgDAPI, ImagePlus imgORF1P, String imgName, String outDir, int fontSize) {
+    public void drawResults(ArrayList<Cell> cellsPop, ImagePlus imgDAPI, ImagePlus imgORF1P, ImagePlus imgLamin, String imgName, String outDir, int fontSize, boolean nucRings) {
         ImageHandler imgObj1 = ImageHandler.wrap(imgDAPI).createSameDimensions();
         ImageHandler imgObj2 = imgObj1.createSameDimensions();
         ImageHandler imgObj3 = imgObj1.createSameDimensions();
-        ImageHandler imgObj4 = imgObj1.createSameDimensions();
-        ImageHandler imgObj5 = imgObj1.createSameDimensions();
+        ImageHandler imgObj4 = (nucRings) ? imgObj1.createSameDimensions() : null;
+        ImageHandler imgObj5 = (nucRings) ? imgObj1.createSameDimensions() : null;
+        ImageHandler imgObj6 = imgObj1.createSameDimensions();
         if (cellsPop.size() > 0) {
             for (Cell cell: cellsPop) {
                 cell.nucleus.drawObject(imgObj1, 255);
                 if (cell.cell != null)
                     cell.cell.drawObject(imgObj2, 255);
                 labelObject(cell.nucleus, imgObj3.getImagePlus(), fontSize);
-                cell.innerRing.drawObject(imgObj4, 255);
-                cell.outerRing.drawObject(imgObj5, 255);
+                if (nucRings) {
+                    cell.innerRing.drawObject(imgObj4, 255);
+                    cell.outerRing.drawObject(imgObj5, 255);
+                }
+                cell.laminSkel.drawObject(imgObj6, 255);
             }
         }
+        
         System.out.println("Saving cells images ...");
         ImagePlus[] imgColors1 = {imgObj3.getImagePlus(), imgObj2.getImagePlus(), imgObj1.getImagePlus(), imgORF1P};
-        ImagePlus imgObjects1 = new RGBStackMerge().mergeHyperstacks(imgColors1, true);
-        imgObjects1.setCalibration(cal);
-        FileSaver ImgObjectsFile1 = new FileSaver(imgObjects1);
-        ImgObjectsFile1.saveAsTiff(outDir + imgName + "_cells.tif"); 
-        flush_close(imgObjects1);
+        ImagePlus imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors1, true);
+        imgObjects.setCalibration(cal);
+        FileSaver ImgObjectsFile = new FileSaver(imgObjects);
+        ImgObjectsFile.saveAsTiff(outDir + imgName + "_cells.tif"); 
+        flush_close(imgObjects);
         
-        System.out.println("Saving rings cell images ...");
-        ImagePlus[] imgColors2 = {imgObj3.getImagePlus(), null, null, imgDAPI, imgObj4.getImagePlus(), null, imgObj5.getImagePlus()};
-        ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, true);
-        imgObjects2.setCalibration(cal);
-        FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
-        ImgObjectsFile2.saveAsTiff(outDir + imgName + "_rings.tif");
-        flush_close(imgObjects2);
+        if (nucRings) {
+            System.out.println("Saving rings cell images ...");
+            ImagePlus[] imgColors2 = {imgObj3.getImagePlus(), null, null, imgDAPI, imgObj4.getImagePlus(), null, imgObj5.getImagePlus()};
+            imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors2, true);
+            ImgObjectsFile = new FileSaver(imgObjects);
+            ImgObjectsFile.saveAsTiff(outDir + imgName + "_rings.tif");
+            flush_close(imgObjects);
+        }
+        
+        System.out.println("Saving lamin skeleton cell images ...");
+        ImagePlus[] imgColors3 = {imgObj6.getImagePlus(), imgObj3.getImagePlus(), null, imgLamin};
+        imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors3, true);
+        imgObjects.setCalibration(cal);
+        ImgObjectsFile = new FileSaver(imgObjects);
+        ImgObjectsFile.saveAsTiff(outDir + imgName + "_skeletons.tif");
+        flush_close(imgObjects);
         
         imgObj1.closeImagePlus();
         imgObj2.closeImagePlus();
         imgObj3.closeImagePlus();
-        imgObj4.closeImagePlus();
-        imgObj5.closeImagePlus();
+        if (nucRings) {
+            imgObj4.closeImagePlus(); 
+            imgObj5.closeImagePlus();
+        }
     }
 }

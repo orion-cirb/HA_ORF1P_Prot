@@ -27,6 +27,7 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import loci.common.Region;
 import loci.plugins.in.ImporterOptions;
+import mcib3d.geom2.Object3DInt;
 import mcib3d.geom2.Objects3DIntPopulation;
 import org.apache.commons.io.FilenameUtils;
 import org.scijava.util.ArrayUtils;
@@ -55,10 +56,7 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
                 IJ.showMessage("Plugin canceled");
                 return;
             }
-            if ((!tools.checkInstalledModules()) || (!tools.checkStarDistModels())) {
-                return;
-            } 
-
+            
                         
             imageDir = IJ.getDirectory("Choose directory containing image files...");
             if (imageDir == null) {
@@ -78,10 +76,9 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
                 outDir.mkdir();
             }
             // Write header in results file
-            String header = "Image name\tImage background\tNucleus ID\tIs HA-ORF1P\tNucleus area (µm3)\tNucleus compactness\tNucleus sphericity\tNucleus elongation"
-                    + "\tNucleus flatness\tNucleus intensity\tNucleus cor. intensity\tNucleus inner area (µm3)\tNucleus inner intensity\tNucleus inner cor. intensity"
-                    + "\tNucleus inner ring area (µm3)\tNucleus inner ring intensity\tNucleus inner ring cor. intensity\tNucleus outer ring area (µm3)"
-                    + "\tNucleus outer ring intensity\tNucleus outer ring cor. intensity\tLamin branches\tLamin junctions\n";
+            String header = "Image name\tImage background\tNucleus ID\tIs HA-ORF1P\tNucleus area (µm3)\tNucleus compactness\tNucleus circularity\tNucleus elongation"
+                    + "\tNucleus cor. intensity\tNucleus inner area (µm2)\tNucleus inner cor. intensity\tNucleus inner ring area (µm2)\tNucleus inner ring cor. intensity"
+                    + "\tNucleus outer ring area (µm2)\tNucleus outer ring cor. intensity\tLamin branches\tLamin junctions\n";
             FileWriter fwResults = new FileWriter(outDirResults + "results.xls", false);
             results = new BufferedWriter(fwResults);
             results.write(header);
@@ -153,35 +150,43 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
                     // Find DAPI nuclei
                     System.out.println("Finding " + chs[0] + " nuclei....");
                     Objects3DIntPopulation nucPop = tools.cellposeDetection(imgNucFocus, tools.cellPoseNucDiameter, roi);
-
-                    // Open ORF1P channel
-                    tools.print("- Analyzing " + chs[1] + " channel -");
-                    indexCh = ArrayUtils.indexOf(channels, chs[1]);
-                    ImagePlus imgORF1P = BF.openImagePlus(options)[indexCh];              
-                    ImagePlus imgORF1PFocus =tools.findBestFocus(imgORF1P);
-                    tools.flush_close(imgORF1P);
                     
-                    // Find cells
-                    System.out.println("Finding " + chs[1] + " cells....");
-                    Objects3DIntPopulation cellPop = tools.cellposeDetection(imgORF1PFocus, tools.cellPoseCellsDiameter, roi);
+                    // Open HA-ORF1P channel
+                    ImagePlus imgORF1PFocus = null;
+                    ArrayList<Cell> colocPop = new ArrayList<>();
+                    if (!chs[1].equals("None")) {
+                        tools.print("- Analyzing " + chs[1] + " channel -");
+                        indexCh = ArrayUtils.indexOf(channels, chs[1]);
+                        ImagePlus imgORF1P = BF.openImagePlus(options)[indexCh];              
+                        imgORF1PFocus =tools.findBestFocus(imgORF1P);
+                        tools.flush_close(imgORF1P);
 
-                    // Colocalization
-                    System.out.println("Finding " + chs[1] + " cells colocalizing with a " + chs[0] + " nuclei...");
-                    ArrayList<Cell> colocPop = tools.findColocPop(cellPop, nucPop, 0.02);
-                    tools.resetLabels(colocPop);
+                        // Find cells
+                        System.out.println("Finding " + chs[1] + " cells....");
+                        Objects3DIntPopulation cellPop = tools.cellposeDetection(imgORF1PFocus, tools.cellPoseCellsDiameter, roi);
 
+                        // Colocalization
+                        System.out.println("Finding " + chs[1] + " cells colocalizing with a " + chs[0] + " nuclei...");
+                        colocPop = tools.findColocPop(cellPop, nucPop, 0.02);
+                        tools.resetLabels(colocPop);
+                    }
+                    
+                    // No HA-ORF1P
+                    if (colocPop.size() == 0)
+                        for (Object3DInt nucObj : nucPop.getObjects3DInt())
+                                colocPop.add(new Cell(null, nucObj));
+                    
+                    
                     // Find nuclei outer ring
-                    System.out.println("Finding outer rings...");
-                    tools.setNucleiRing(colocPop, imgNucFocus, tools.outerNucDil, true);
-                    // Find nuclei inner ring and inner nucleus
-                    System.out.println("Finding inner rings and inner nuclei...");
-                    tools.setNucleiRing(colocPop, imgNucFocus, tools.innerNucDil, false);
-
-                    // Save image objects
-                    tools.print("- Saving results -");
-                    tools.drawResults(colocPop, imgNucFocus, imgORF1PFocus, rootName, outDirResults, 40);
-                    tools.flush_close(imgNucFocus);
-                    tools.flush_close(imgORF1PFocus);
+                    // No Prot
+                    if (!chs[3].equals("None")) {
+                        // Find nuclei outer ring
+                        System.out.println("Finding outer rings...");
+                        tools.setNucleiRing(colocPop, imgNucFocus, tools.outerNucDil, true);
+                        // Find nuclei inner ring and inner nucleus
+                        System.out.println("Finding inner rings and inner nuclei...");
+                        tools.setNucleiRing(colocPop, imgNucFocus, tools.innerNucDil, false);
+                    }
                     
                     // Find lamin parameters
                     // Open lamin channel
@@ -191,33 +196,46 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
                     ImagePlus imgLaminFocus =tools.findBestFocus(imgLamin);
                     tools.flush_close(imgLamin);
                     
-                    
                     // Open protein channel
-                    tools.print("- Analyzing " + chs[3] + " channel -");
-                    indexCh = ArrayUtils.indexOf(channels, chs[3]);
-                    ImagePlus imgProt = BF.openImagePlus(options)[indexCh];
-                    ImagePlus imgProtFocus = tools.findBestFocus(imgProt);
-                    tools.flush_close(imgProt);
-                    // Find background 
-                    double bgProt = tools.findBackground(imgProtFocus, roi);
+                    ImagePlus imgProtFocus = null;
+                    double bgProt = 0;
+                    // No prot
+                    if (!chs[3].equals("None")) {
+                        tools.print("- Analyzing " + chs[3] + " channel -");
+                        indexCh = ArrayUtils.indexOf(channels, chs[3]);
+                        ImagePlus imgProt = BF.openImagePlus(options)[indexCh];
+                        imgProtFocus = tools.findBestFocus(imgProt);
+                        tools.flush_close(imgProt);
+                        // Find background 
+                        bgProt = tools.findBackground(imgProtFocus, roi);
+                    }
 
                     // Tag nuclei with parameters
                     tools.print("- Measuring cells parameters -");
                     tools.tagCells(imgProtFocus, imgLaminFocus, colocPop);
-                    tools.flush_close(imgProtFocus);
-
+                    if (imgProtFocus != null)
+                        tools.flush_close(imgProtFocus);
+                    
                     // Write results
                     for (Cell cell: colocPop) {
                         HashMap<String, Double> params = cell.params;
                         String isHAORF1P = (cell.cell == null) ? "No" : "Yes";
-                        results.write(rootName+"\t"+bgProt+"\t"+(int)((double)params.get("index"))+"\t"+isHAORF1P+"\t"+params.get("nucVol")+"\t"+params.get("nucComp")+"\t"
-                                +params.get("nucSph")+"\t"+params.get("nucEllElong")+"\t"+params.get("nucEllFlat")+"\t"+params.get("nucInt")+"\t"
-                                +(params.get("nucInt")-bgProt*params.get("nucVol"))+"\t"+params.get("innerNucVol")+"\t"+params.get("innerNucInt")+"\t"
-                                +(params.get("innerNucInt")-bgProt*params.get("innerNucVol"))+"\t"+params.get("innerRingVol")+"\t"+params.get("innerRingInt")+"\t"
-                                +(params.get("innerRingInt")-bgProt*params.get("innerRingVol"))+"\t"+params.get("outerRingVol")+"\t"+params.get("outerRingInt")+"\t"
-                                +(params.get("outerRingInt")-bgProt*params.get("outerRingVol"))+"\t"+params.get("nucBranches")+"\t"+params.get("nucJunctions")+"\n");
+                        results.write(rootName+"\t"+bgProt+"\t"+(int)((double)params.get("index"))+"\t"+isHAORF1P+"\t"+params.get("nucArea")+"\t"+params.get("nucComp")+"\t"
+                                +params.get("nucCirc")+"\t"+params.get("nucEllElong")+"\t"+(params.get("nucInt")-bgProt*params.get("nucArea"))+"\t"
+                                +params.get("innerNucArea")+"\t"+(params.get("innerNucInt")-bgProt*params.get("innerNucArea"))+"\t"+params.get("innerRingArea")+"\t"
+                                +(params.get("innerRingInt")-bgProt*params.get("innerRingArea"))+"\t"+params.get("outerRingArea")+"\t"
+                                +(params.get("outerRingInt")-bgProt*params.get("outerRingArea"))+"\t"+params.get("nucBranches")+"\t"+params.get("nucJunctions")+"\n");
                         results.flush();
                     }
+                    
+                    // Save image objects
+                    tools.print("- Saving results -");
+                    tools.drawResults(colocPop, imgNucFocus, imgORF1PFocus, imgLaminFocus, rootName, outDirResults, 40, !chs[3].equals("None"));
+                    tools.flush_close(imgNucFocus);
+                    tools.flush_close(imgLaminFocus);
+                    
+                    if (imgORF1PFocus != null)
+                        tools.flush_close(imgORF1PFocus);
                 }
             }
             results.close();

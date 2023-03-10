@@ -10,21 +10,25 @@
 
 3 channels:
   1. *405:* DNA
-  2. *642:* HA-ORF1P
-  3. *561:* Protein
+  2. *642:* HA-ORF1P (not neccessary)
+  3. *561:* Lamin
+  4. *488:* Prot (not neccessary)
 
 ### Plugin description
 
 * Check if roi
-* Find nucleus with Stardist
-* Find HA-ORF1P with cellpose
+* Find nucleus with cellpose
+* Find HA-ORF1P with cellpose 
 * Find nuclei colocalized with HA-ORF1P cells
-* Compute nucleus form factors and intensity for nucleus / HA-ORF1P+- cells
+* Compute nucleus form factors and intensity for nucleus / HA-ORF1P+- cells in prot
+* Compute lamin form parameters with skeletons
 
 
 ### Dependencies
 
-* None
+* cellpose
+* clij
+* 3D image suite
 
 ### Version history
 

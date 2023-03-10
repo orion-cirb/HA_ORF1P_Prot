@@ -13,6 +13,7 @@ public class Cell {
     public Object3DInt innerRing;
     public Object3DInt outerRing;
     public Object3DInt innerNucleus;
+    public Object3DInt laminSkel;
     public double branches;
     public double junctions;
     public HashMap<String, Double> params;
@@ -35,33 +36,36 @@ public class Cell {
         this.innerNucleus = innerNucleus;
     }
     
+    public void setLaminSkel(Object3DInt laminSkel) {
+        this.laminSkel = laminSkel;
+    }
     
-    public void setParams(double index, double nucVol, double nucComp, double nucSph, double nucEllElong, double nucEllFlat, double nucInt, 
-                double innerNucVol, double innerNucInt, double innerRingVol, double innerRingInt, double outerRingVol, double outerRingInt,
+    
+    public void setParams(double index, double nucArea, double nucComp, double nucCirc, double nucEllElong, double nucInt, 
+                double innerNucArea, double innerNucInt, double innerRingArea, double innerRingInt, double outerRingArea, double outerRingInt,
                 double nucBranches, double nucJunctions) {
         
         params.put("index", index);
         
         // Nucleus
-        params.put("nucVol", nucVol);
+        params.put("nucArea", nucArea);
         params.put("nucComp", nucComp);
-        params.put("nucSph", nucSph);
+        params.put("nucCirc", nucCirc);
         params.put("nucEllElong", nucEllElong);
-        params.put("nucEllFlat", nucEllFlat);
         params.put("nucInt", nucInt);
         params.put("nucBranches", nucBranches);
         params.put("nucJunctions", nucJunctions);
         
         // Inner nucleus
-        params.put("innerNucVol", innerNucVol);
+        params.put("innerNucArea", innerNucArea);
         params.put("innerNucInt", innerNucInt);
         
         // Inner ring
-        params.put("innerRingVol", innerRingVol);
+        params.put("innerRingArea", innerRingArea);
         params.put("innerRingInt", innerRingInt);
         
         // Outer ring
-        params.put("outerRingVol", outerRingVol);
+        params.put("outerRingArea", outerRingArea);
         params.put("outerRingInt", outerRingInt);
         
     }
