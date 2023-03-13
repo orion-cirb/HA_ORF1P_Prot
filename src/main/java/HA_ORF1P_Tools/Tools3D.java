@@ -392,7 +392,7 @@ public class Tools3D {
         img.setRoi(roi);
         ImagePlus imgCrop = new Duplicator().crop(img);
         imgCrop.deleteRoi();
-        ImagePlus imgLOG = LOG_filter(imgCrop, 5);
+        ImagePlus imgLOG = LOG_filter(imgCrop, 6);
         flush_close(imgCrop);
         ImagePlus imgBin = threshold(imgLOG, "Li");
         flush_close(imgLOG);
