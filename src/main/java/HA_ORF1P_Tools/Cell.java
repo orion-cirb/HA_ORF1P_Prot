@@ -43,7 +43,7 @@ public class Cell {
     
     public void setParams(double index, double nucArea, double nucComp, double nucCirc, double nucEllElong, double nucInt, 
                 double innerNucArea, double innerNucInt, double innerRingArea, double innerRingInt, double outerRingArea, double outerRingInt,
-                double nucBranches, double nucJunctions) {
+                double cellArea, double cellInt, double nucBranches, double nucJunctions) {
         
         params.put("index", index);
         
@@ -55,6 +55,10 @@ public class Cell {
         params.put("nucInt", nucInt);
         params.put("nucBranches", nucBranches);
         params.put("nucJunctions", nucJunctions);
+        
+        // Cell
+        params.put("cellArea", cellArea);
+        params.put("cellInt", cellInt);
         
         // Inner nucleus
         params.put("innerNucArea", innerNucArea);

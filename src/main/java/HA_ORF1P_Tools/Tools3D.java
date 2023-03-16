@@ -641,6 +641,8 @@ public class Tools3D {
            double innerRingNucInt = 0;
            double outerRingArea = 0;
            double outerRingInt = 0;
+            double cellArea = 0;
+            double cellInt = 0;
            double nucArea = new MeasureVolume(cell.nucleus).getVolumeUnit();
            double nucComp = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.COMP_CORRECTED);
            double nucCirc = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.SPHER_CORRECTED);
@@ -660,6 +662,11 @@ public class Tools3D {
                 // Get outer ring parameters
                 outerRingArea = new MeasureVolume(cell.outerRing).getVolumeUnit();
                 outerRingInt = new MeasureIntensity(cell.outerRing, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+                
+                // Cell
+                cellArea = (cell.cell != null) ? new MeasureVolume(cell.cell).getVolumeUnit() : 0;
+                cellInt = (cell.cell != null) ? new MeasureIntensity(cell.cell, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM) : 0;
+                    
            }
 
             // Get lamin parameters
@@ -667,7 +674,7 @@ public class Tools3D {
             
             // Add all parameters to cell
             cell.setParams(cell.nucleus.getLabel(), nucArea, nucComp, nucCirc, nucElongation, nucInt, innerNucArea, innerNucInt, innerRingNucArea, innerRingNucInt,
-                    outerRingArea, outerRingInt, laminParams[0], laminParams[1]);
+                    outerRingArea, outerRingInt, cellArea, cellInt, laminParams[0], laminParams[1]);
         }
         if (imgProt != null)
             imh.closeImagePlus();

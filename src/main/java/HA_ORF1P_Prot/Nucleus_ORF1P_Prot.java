@@ -78,7 +78,7 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
             // Write header in results file
             String header = "Image name\tImage background\tNucleus ID\tIs HA-ORF1P\tNucleus area (µm3)\tNucleus compactness\tNucleus circularity\tNucleus elongation"
                     + "\tNucleus cor. intensity\tNucleus inner area (µm2)\tNucleus inner cor. intensity\tNucleus inner ring area (µm2)\tNucleus inner ring cor. intensity"
-                    + "\tNucleus outer ring area (µm2)\tNucleus outer ring cor. intensity\tLamin branches\tLamin junctions\n";
+                    + "\tNucleus outer ring area (µm2)\tNucleus outer ring cor. intensity\tCell area (µm2)\tCell cor. intensty\tLamin branches\tLamin junctions\n";
             FileWriter fwResults = new FileWriter(outDirResults + "results.xls", false);
             results = new BufferedWriter(fwResults);
             results.write(header);
@@ -224,7 +224,8 @@ public class Nucleus_ORF1P_Prot implements PlugIn {
                                 +params.get("nucCirc")+"\t"+params.get("nucEllElong")+"\t"+(params.get("nucInt")-bgProt*params.get("nucArea"))+"\t"
                                 +params.get("innerNucArea")+"\t"+(params.get("innerNucInt")-bgProt*params.get("innerNucArea"))+"\t"+params.get("innerRingArea")+"\t"
                                 +(params.get("innerRingInt")-bgProt*params.get("innerRingArea"))+"\t"+params.get("outerRingArea")+"\t"
-                                +(params.get("outerRingInt")-bgProt*params.get("outerRingArea"))+"\t"+params.get("nucBranches")+"\t"+params.get("nucJunctions")+"\n");
+                                +(params.get("outerRingInt")-bgProt*params.get("outerRingArea"))+"\t"+params.get("cellArea")+"\t"
+                                        +(params.get("cellInt")-bgProt*params.get("cellArea"))+"\t"+params.get("nucBranches")+"\t"+params.get("nucJunctions")+"\n");
                         results.flush();
                     }
                     
