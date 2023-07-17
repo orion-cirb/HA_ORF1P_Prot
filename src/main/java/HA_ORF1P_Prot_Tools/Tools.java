@@ -199,10 +199,10 @@ public class Tools {
      */
     public String[] dialog(String[] channels) {
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
-        gd.setInsets​(0, 80, 0);
+        gd.setInsets​(0, 60, 0);
         gd.addImage(icon);
           
-        gd.addMessage("Channels", new Font(Font.MONOSPACED , Font.BOLD, 12), Color.blue);
+        gd.addMessage("Channels", Font.getFont("Monospace"), Color.blue);
         int index = 0;
         for (String chName: channelsName) {
             gd.addChoice(chName + ": ", channels, channels[index]);
@@ -210,16 +210,16 @@ public class Tools {
         }
         
         gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Min nucleus area (µm2):", minNucArea);
-        gd.addNumericField("Max nucleus area (µm2):", maxNucArea);   
+        gd.addNumericField("Min area (µm2):", minNucArea);
+        gd.addNumericField("Max area (µm2):", maxNucArea);   
         
         gd.addMessage("Nuclei rings", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Nucleus outer ring (µm):", outerNucDil);
-        gd.addNumericField("Nucleus inner ring (µm):", innerNucDil);
+        gd.addNumericField("Outer ring (µm):", outerNucDil);
+        gd.addNumericField("Inner ring (µm):", innerNucDil);
         
         gd.addMessage("HA-ORF1p cells detection", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Min cell area (µm2): ", minCellArea);
-        gd.addNumericField("Max cell area (µm2): ", maxCellArea);
+        gd.addNumericField("Min area (µm2): ", minCellArea);
+        gd.addNumericField("Max area (µm2): ", maxCellArea);
         
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("XY calibration (µm):", cal.pixelWidth);
