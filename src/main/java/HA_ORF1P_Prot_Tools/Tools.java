@@ -57,7 +57,7 @@ public class Tools {
     private final CLIJ2 clij2 = CLIJ2.getInstance(); 
     private final Find_focused_slices focus = new Find_focused_slices();
     
-    public String[] channelsName = {"DAPI (mandatory)", "HA-ORF1P (optional)", "Protein (mandatory)"}; 
+    public String[] channelsName = {"Nuclei (mandatory)", "HA-ORF1P (optional)", "Protein (mandatory)"}; 
     public Calibration cal = new Calibration();
     public float pixArea;
    
