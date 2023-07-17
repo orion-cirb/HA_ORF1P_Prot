@@ -11,7 +11,9 @@
         <packaging>jar</packaging>
 	<name>plugins/HA_ORF1P_Prot</name>
 	<description>
-            Intensity in nucleus and cytoplasm of ORF1P cells
+            Detect nuclei and HA-ORF1p cells in 2D
+            Compute their colocalization, distinguish nuclei being HA-ORF1p+ and HA-ORF1p-
+            Measure intensity of protein in different nuclear compartments
         </description>
 
 	<developers>
@@ -26,8 +28,18 @@
 			</roles>
 			<timezone>-1</timezone>
 		</developer>
+                <developer>
+                    <id>hm</id>
+                    <name>Héloïse Monnet</name>
+                    <email>heloise.monnet@college-de-france.fr</email>
+                    <url></url>
+                    <organization>CIRB, Collège de France</organization>
+                    <roles>
+                            <role>developer</role>
+                    </roles>
+                    <timezone>-1</timezone>
+		</developer>
 	</developers>
-
         
 	<properties>
                 <imagej.app.directory>/opt/Fiji.app/</imagej.app.directory>

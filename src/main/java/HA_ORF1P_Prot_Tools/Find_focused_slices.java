@@ -1,11 +1,11 @@
-package HA_ORF1P_Tools;
-
+package HA_ORF1P_Prot_Tools;
 
 import ij.*;
 import ij.process.*;
 import java.awt.*;
 import ij.plugin.filter.*;
 import ij.measure.*;
+
 
 /** Select focused slices from a Z stack. Based on the autofocus algorithm "Normalized Variance" (Groen et al., 1985; Yeo et
  * al., 1993). However, the images are first treated by a sobel edge filter. This provided a better result for fluorescent bead images.
@@ -17,7 +17,6 @@ import ij.measure.*;
  * Fifth version 2020-2-17 output to result table
  * By TSENG Qingzong; qztseng at gmail.com
  */
- 
 public class Find_focused_slices implements PlugInFilter, Measurements {
 
     double percent, vThr;
@@ -105,7 +104,7 @@ public class Find_focused_slices implements PlugInFilter, Measurements {
         focusstack.setStack("Focused slices of " + name + "_" + percent + "%", stack2);
         focusstack.setCalibration(imp.getCalibration());
         if (focusstack.getStackSize() == 1) {
-            focusstack.setProperty("Label", "Z_" + fS);
+            focusstack.setProp("Label", fS);
         }
         return(focusstack);
     }
