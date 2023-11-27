@@ -1,5 +1,5 @@
 * **Developed for:** Rania
-* **Team:** Prochiantz
+* **Team:** Fuchs
 * **Date:** July 2023
 * **Software:** Fiji
 
