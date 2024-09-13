@@ -1,3 +1,5 @@
+# HA_ORF1P_Prot
+
 * **Developed for:** Rania
 * **Team:** Fuchs
 * **Date:** July 2023
@@ -5,14 +7,14 @@
 
 ### Images description
 
-3D images taken with a x25 objective.
+3D images taken with a x63 objective.
 
 3 channels:
   1. *405:* Nuclei (mandatory)
   2. *488:* Protein (mandatory)
   3. *642:* HA-ORF1p (optional)
      
-If *.roi* file is provided, analysis is performed in it. Otherwise, analysis is performed in the entire image. 
+With each image, a *.roi* or *.zip* file can be provided containing one or multiple ROI(s). If a ROI is provided, analysis is performed in it. Otherwise, analysis is performed in the entire image. 
 
 ### Plugin description
 
@@ -29,5 +31,5 @@ If *.roi* file is provided, analysis is performed in it. Otherwise, analysis is 
 
 ### Version history
 
-Version 2 released on July 17, 2023.
+Version 2 released on July 17, 2023. Corrected on September 13, 2024.
 
