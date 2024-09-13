@@ -15,12 +15,14 @@ import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.ParticleAnalyzer;
+import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import java.awt.Color;
 import java.awt.Font;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -52,14 +54,14 @@ import org.apache.commons.io.FilenameUtils;
  */
 public class Tools {
     public final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
-    private final String helpUrl = "https://github.com/orion-cirb/HA_ORF1P_Prot.git";
+    private final String helpUrl = "https://github.com/orion-cirb/HA_ORF1P_Prot";
     
     private final CLIJ2 clij2 = CLIJ2.getInstance(); 
     private final Find_focused_slices focus = new Find_focused_slices();
     
-    public String[] channelsName = {"Nuclei (mandatory)", "HA-ORF1P (optional)", "Protein (mandatory)"}; 
+    public String[] chDialog = {"Nuclei (mandatory)", "HA-ORF1p (optional)", "Protein (mandatory)"}; 
     public Calibration cal = new Calibration();
-    public float pixArea;
+    public double pixArea;
    
     // Cellpose
     public String cellposeEnvDirPath = (IJ.isWindows()) ? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose" : "/opt/miniconda3/envs/cellpose";
@@ -73,8 +75,8 @@ public class Tools {
     public double maxCellArea = 400;
     
     // Nuclei rings
-    public float outerNucDil = 1;
-    public float innerNucDil = 1;
+    public double outerNucDil = 1;
+    public double innerNucDil = 1;
     
       
 
@@ -88,20 +90,29 @@ public class Tools {
     
     
     /**
+     * Flush and close an image
+     */
+    public void closeImage(ImagePlus img) {
+        img.flush();
+        img.close();
+    }
+    
+    
+    /**
      * Check that needed modules are installed
      */
     public boolean checkInstalledModules() {
         ClassLoader loader = IJ.getClassLoader();
         try {
-            loader.loadClass("mcib3d.geom.Object3D");
-        } catch (ClassNotFoundException e) {
-            IJ.showMessage("Error", "3D ImageJ Suite not installed, please install from update site");
-            return false;
-        }
-        try {
             loader.loadClass("net.haesleinhuepf.clij2.CLIJ2");
         } catch (ClassNotFoundException e) {
             IJ.log("CLIJ not installed, please install from update site");
+            return false;
+        }
+        try {
+            loader.loadClass("mcib3d.geom2.Object3DInt");
+        } catch (ClassNotFoundException e) {
+            IJ.log("3D ImageJ Suite not installed, please install from update site");
             return false;
         }
         return true;
@@ -109,21 +120,58 @@ public class Tools {
     
     
     /**
-     * Find images in folder
+     * Get extension of the first image found in the folder
      */
-    public ArrayList findImages(String imagesFolder, String imageExt) {
+    public String findImageType(File imagesFolder) {
+        String ext = "";
+        String[] files = imagesFolder.list();
+        for (String name : files) {
+            String fileExt = FilenameUtils.getExtension(name);
+            switch (fileExt) {
+                case "nd" :
+                   ext = fileExt;
+                   break;
+                case "nd2" :
+                   ext = fileExt;
+                   break;
+                case "lif"  :
+                    ext = fileExt;
+                    break;
+                case "czi" :
+                   ext = fileExt;
+                   break;
+                case "ics" :
+                    ext = fileExt;
+                    break;
+                case "ics2" :
+                    ext = fileExt;
+                    break;
+                case "lsm" :
+                    ext = fileExt;
+                    break;
+                case "tif" :
+                    ext = fileExt;
+                    break;
+                case "tiff" :
+                    ext = fileExt;
+                    break;
+            }
+        }
+        return(ext);
+    }
+    
+    
+    /**
+     * Get images with given extension in folder
+     */
+    public ArrayList<String> findImages(String imagesFolder, String imageExt) {
         File inDir = new File(imagesFolder);
         String[] files = inDir.list();
-        if (files == null) {
-            System.out.println("No image found in " + imagesFolder);
-            return null;
-        }
         ArrayList<String> images = new ArrayList();
         for (String f : files) {
-            // Find images with extension
             String fileExt = FilenameUtils.getExtension(f);
             if (fileExt.equals(imageExt) && !f.startsWith("."))
-                images.add(imagesFolder + File.separator + f);
+                images.add(imagesFolder + f);
         }
         Collections.sort(images);
         return(images);
@@ -131,9 +179,10 @@ public class Tools {
     
    
     /**
-     * Find image calibration
+     * Get image calibration
      */
-    public Calibration findImageCalib(IMetadata meta) {
+    public void findImageCalib(IMetadata meta) {
+        cal = new Calibration();
         cal.pixelWidth = meta.getPixelsPhysicalSizeX(0).value().doubleValue();
         cal.pixelHeight = cal.pixelWidth;
         if (meta.getPixelsPhysicalSizeZ(0) != null)
@@ -142,12 +191,11 @@ public class Tools {
             cal.pixelDepth = 1;
         cal.setUnit("microns");
         System.out.println("XY calibration = " + cal.pixelWidth + ", Z calibration = " + cal.pixelDepth);
-        return(cal);
     }
     
     
     /**
-     * Find channels name
+     * Get channels name and add None at the end of channels list
      * @throws loci.common.services.DependencyException
      * @throws loci.common.services.ServiceException
      * @throws loci.formats.FormatException
@@ -179,11 +227,11 @@ public class Tools {
                 break;
             case "ics" :
                 for (int n = 0; n < chs; n++) 
-                    channels[n] = (meta.getChannelID(0, n) == null) ? channels[n] = Integer.toString(n) : meta.getChannelExcitationWavelength(0, n).value().toString();
+                    channels[n] = meta.getChannelEmissionWavelength(0, n).value().toString();
                 break;    
             case "ics2" :
                 for (int n = 0; n < chs; n++) 
-                    channels[n] = (meta.getChannelID(0, n) == null) ? channels[n] = Integer.toString(n) : meta.getChannelExcitationWavelength(0, n).value().toString();
+                    channels[n] = meta.getChannelEmissionWavelength(0, n).value().toString();
                 break; 
             default :
                 for (int n = 0; n < chs; n++)
@@ -197,66 +245,80 @@ public class Tools {
     /**
      * Generate dialog box
      */
-    public String[] dialog(String[] channels) {
+    public String[] dialog(String[] chMeta) {
         GenericDialogPlus gd = new GenericDialogPlus("Parameters");
-        gd.setInsets​(0, 60, 0);
+        gd.setInsets​(0, 40, 0);
         gd.addImage(icon);
           
-        gd.addMessage("Channels", Font.getFont("Monospace"), Color.blue);
-        int index = 0;
-        for (String chName: channelsName) {
-            gd.addChoice(chName + ": ", channels, channels[index]);
-            index++;
-        }
+        gd.addMessage("Channels", new Font("Monospace", Font.BOLD, 12), Color.blue);
+        for (int n = 0; n < chDialog.length; n++)
+            gd.addChoice(chDialog[n]+": ", chMeta, chMeta[n]);
         
         gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min area (µm2):", minNucArea);
         gd.addNumericField("Max area (µm2):", maxNucArea);   
         
         gd.addMessage("Nuclei rings", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("Outer ring (µm):", outerNucDil);
-        gd.addNumericField("Inner ring (µm):", innerNucDil);
+        gd.addNumericField("Outer ring (µm):", outerNucDil, 2);
+        gd.addNumericField("Inner ring (µm):", innerNucDil, 2);
         
         gd.addMessage("HA-ORF1p cells detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min area (µm2): ", minCellArea);
         gd.addNumericField("Max area (µm2): ", maxCellArea);
         
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
-        gd.addNumericField("XY calibration (µm):", cal.pixelWidth);
+        gd.addNumericField("XY calibration (µm):", cal.pixelWidth, 4);
         gd.addHelp(helpUrl);
         gd.showDialog();
         
-        String[] ch = new String[channelsName.length];
-        for (int i = 0; i < channelsName.length; i++)
-            ch[i] = gd.getNextChoice();
+        String[] chOrder = new String[chDialog.length];
+        for (int n = 0; n < chOrder.length; n++)
+            chOrder[n] = gd.getNextChoice();
        
-        minNucArea = (float) gd.getNextNumber();
-        maxNucArea = (float) gd.getNextNumber();
-        outerNucDil = (float) gd.getNextNumber();
-        innerNucDil = (float) gd.getNextNumber();
-        minCellArea= (float) gd.getNextNumber();
-        maxCellArea = (float) gd.getNextNumber();
+        minNucArea = gd.getNextNumber();
+        maxNucArea = gd.getNextNumber();
+        
+        outerNucDil = gd.getNextNumber();
+        innerNucDil = gd.getNextNumber();
+        
+        minCellArea= gd.getNextNumber();
+        maxCellArea = gd.getNextNumber();
+        
         cal.pixelWidth = cal.pixelHeight = gd.getNextNumber();
         cal.pixelDepth = 1;
-        pixArea = (float) (cal.pixelWidth*cal.pixelHeight);
+        pixArea = cal.pixelWidth*cal.pixelHeight;
         
-        if(gd.wasCanceled())
-            ch = null;
-        return(ch);
+        if (gd.wasCanceled())
+            chOrder = null;
+        return(chOrder);
     }
     
     
     /**
-     * Flush and close an image
+     * Load ROIs, if any provided
      */
-    public void closeImg(ImagePlus img) {
-        img.flush();
-        img.close();
+    public List<Roi> loadRois(String imgDir, String imgName, ImageProcessorReader reader) {
+        List<Roi> rois = new ArrayList<>();
+        
+        String roiName = imgDir+imgName;
+        roiName = new File(roiName+".zip").exists() ? roiName+".zip" : roiName+".roi";
+        if (new File(roiName).exists()) {
+            RoiManager rm = new RoiManager(false);
+            rm.runCommand("Open", roiName);
+            rois = Arrays.asList(rm.getRoisAsArray());
+        } else {
+            Roi roi = new Roi(0, 0, reader.getSizeX(), reader.getSizeY());
+            roi.setName("entire image");
+            rois.add(roi);
+            System.out.println("WARNING: No ROI file found for image " + imgName + ", entire image is analyzed.");
+        }
+
+        return(rois);
     }
     
     
     /**
-     * Find best focuseds slice in stack
+     * Find best focuses slice in stack
      */
     public ImagePlus findBestFocus(ImagePlus img) {
         focus.setParams(100, 0, false, false);
@@ -289,8 +351,8 @@ public class Tools {
         popFilterSize(pop, minArea, maxArea);
         System.out.println(pop.getNbObjects() + " detections remaining after size filtering");
         
-        closeImg(imgDup);
-        closeImg(imgOut);
+        closeImage(imgDup);
+        closeImage(imgOut);
         return(pop);
     } 
     
@@ -379,7 +441,7 @@ public class Tools {
     /**
      * Compute the inner/outer ring of nuclei in cell population
      */
-    public void setNucleiRing(ArrayList<Cell> cellsPop, ImagePlus img, float dilCoef, boolean dil) {
+    public void setNucleiRing(ArrayList<Cell> cellsPop, ImagePlus img, double dilCoef, boolean dil) {
         int dilCoefPix  = (int) Math.ceil(dilCoef / cal.pixelWidth);
         for (Cell cell: cellsPop) {
             if (dil) {
@@ -478,7 +540,7 @@ public class Tools {
       
       double bg = imp.getStatistics().median;
       System.out.println("Background (median intensity of the min projection) = " + bg);
-      closeImg(imgProj);
+      closeImage(imgProj);
       return(bg);
     }
     
@@ -546,7 +608,7 @@ public class Tools {
         pa.analyze(planeImg​);
         double circ = rt.getValue("Circ.", 0);
         
-        closeImg(planeImg);
+        closeImage(planeImg);
         return(circ);
     }
         
@@ -591,13 +653,13 @@ public class Tools {
         imgObjects.setCalibration(cal);
         FileSaver ImgObjectsFile = new FileSaver(imgObjects);
         ImgObjectsFile.saveAsTiff(outDir + imgName + "_cells.tif"); 
-        closeImg(imgObjects);
+        closeImage(imgObjects);
         
         ImagePlus[] imgColors1 = {null, null, null, imgDAPI, imgObj3.getImagePlus(), null, imgObj4.getImagePlus()};
         imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors1, true);
         ImgObjectsFile = new FileSaver(imgObjects);
         ImgObjectsFile.saveAsTiff(outDir + imgName + "_rings.tif");
-        closeImg(imgObjects);
+        closeImage(imgObjects);
         
         imgObj1.closeImagePlus();
         imgObj2.closeImagePlus();
