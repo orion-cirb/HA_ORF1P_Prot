@@ -67,16 +67,16 @@ public class Tools {
     public String cellposeEnvDirPath = (IJ.isWindows()) ? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose" : "/opt/miniconda3/envs/cellpose";
     public String cellposeNucModel = "cyto2";
     public int cellposeNucDiameter = 120;
-    public double minNucArea = 20;
-    public double maxNucArea = 200;
+    public double minNucArea = 20; // µm3
+    public double maxNucArea = 200; // µm3
     public String cellposeCellsModel = "cyto2";
     public int cellposeCellsDiameter = 200;
-    public double minCellArea = 100;
-    public double maxCellArea = 400;
+    public double minCellArea = 100; // µm3
+    public double maxCellArea = 400; // µm3
     
     // Nuclei rings
-    public double outerNucDil = 1;
-    public double innerNucDil = 1;
+    public double outerNucDil = 1; // µm
+    public double innerNucDil = 1; // µm
     
       
 
@@ -445,7 +445,7 @@ public class Tools {
         int dilCoefPix  = (int) Math.ceil(dilCoef / cal.pixelWidth);
         for (Cell cell: cellsPop) {
             if (dil) {
-                Object3DInt nucDil =  getMorphologicalObject3D(cell.nucleus, img, BinaryMorpho.MORPHO_DILATE, dilCoefPix);
+                Object3DInt nucDil = getMorphologicalObject3D(cell.nucleus, img, BinaryMorpho.MORPHO_DILATE, dilCoefPix);
                 if (nucDil != null) { 
                     Object3DComputation objComputation = new Object3DComputation​(nucDil);
                     Object3DInt ring = objComputation.getObjectSubtracted(cell.nucleus);
@@ -481,10 +481,10 @@ public class Tools {
         ImagePlus imgSeg = null;
         switch (op) {
             case BinaryMorpho.MORPHO_DILATE :
-                imgSeg = maxFilter(imgCrop, rad, 0);
+                imgSeg = maxFilter2D(imgCrop, rad);
                 break;
             case BinaryMorpho.MORPHO_ERODE :
-                imgSeg = minFilter(imgCrop, rad, 0);
+                imgSeg = minFilter2D(imgCrop, rad);
                 break;
         }
         ImageHandler imhSeg = ImageHandler.wrap(imgSeg);
@@ -500,12 +500,12 @@ public class Tools {
     
     
     /**
-     * Max filter using CLIJ2
+     * Max filter 2D using CLIJ2
      */ 
-    private ImagePlus maxFilter(ImagePlus img, double sizeXY, double sizeZ) {
+    private ImagePlus maxFilter2D(ImagePlus img, double sizeXY) {
        ClearCLBuffer imgCL = clij2.push(img);
        ClearCLBuffer imgCLMax = clij2.create(imgCL);
-       clij2.maximum3DBox(imgCL, imgCLMax, sizeXY, sizeXY, sizeZ);
+       clij2.maximum2DSphere(imgCL, imgCLMax, sizeXY, sizeXY);
        ImagePlus imgMax = clij2.pull(imgCLMax);
        clij2.release(imgCL);
        clij2.release(imgCLMax);
@@ -514,12 +514,12 @@ public class Tools {
     
     
     /**
-     * Min filter using CLIJ2
+     * Min filter 2D using CLIJ2
      */ 
-    private ImagePlus minFilter(ImagePlus img, double sizeXY, double sizeZ) {
+    private ImagePlus minFilter2D(ImagePlus img, double sizeXY) {
        ClearCLBuffer imgCL = clij2.push(img);
        ClearCLBuffer imgCLMin = clij2.create(imgCL);
-       clij2.minimum3DBox(imgCL, imgCLMin, sizeXY, sizeXY, sizeZ);
+       clij2.minimum2DSphere(imgCL, imgCLMin, sizeXY, sizeXY);
        ImagePlus imgMin = clij2.pull(imgCLMin);
        clij2.release(imgCL);
        clij2.release(imgCLMin);
@@ -571,7 +571,7 @@ public class Tools {
             double nucCircV1 = new MeasureCompactness(cell.nucleus).getValueMeasurement(MeasureCompactness.SPHER_CORRECTED);
             double nucCircV2 = computeNucleusCircularity(cell.nucleus, imgProt);
             double nucInt = new MeasureIntensity(cell.nucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM)-bg*nucArea/pixArea;
-
+            
             // Get inner nucleus parameters
             double innerNucArea = new MeasureVolume(cell.innerNucleus).getVolumeUnit();
             double innerNucInt = new MeasureIntensity(cell.innerNucleus, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SUM)-bg*innerNucArea/pixArea;
@@ -657,6 +657,7 @@ public class Tools {
         
         ImagePlus[] imgColors1 = {null, null, null, imgDAPI, imgObj3.getImagePlus(), null, imgObj4.getImagePlus()};
         imgObjects = new RGBStackMerge().mergeHyperstacks(imgColors1, true);
+        imgObjects.setCalibration(cal);
         ImgObjectsFile = new FileSaver(imgObjects);
         ImgObjectsFile.saveAsTiff(outDir + imgName + "_rings.tif");
         closeImage(imgObjects);

@@ -126,9 +126,9 @@ public class HA_ORF1P_Prot implements PlugIn {
                     // Open nuclei channel
                     tools.print("- Opening nuclei channel -");
                     int index = ArrayUtils.indexOf(chMeta, chOrder[0]);
-                    ImagePlus stackNuclei = BF.openImagePlus(options)[index];
+                    ImagePlus stackNuclei = BF.openImagePlus(options)[index];                   
                     ImagePlus imgNuclei = tools.findBestFocus(stackNuclei);
-                    int focusedSlice =  Integer.valueOf(imgNuclei.getProp("Label"));                   
+                    int focusedSlice =  Integer.valueOf(imgNuclei.getProp("Label"));
                     tools.closeImage(stackNuclei);
                     
                     // Detect nuclei
@@ -141,7 +141,7 @@ public class HA_ORF1P_Prot implements PlugIn {
                     if (!chOrder[1].equals("None")) {
                         tools.print("- Opening HA-ORF1p channel -");
                         index = ArrayUtils.indexOf(chMeta, chOrder[1]);
-                        ImagePlus stackHAORF1P = BF.openImagePlus(options)[index];              
+                        ImagePlus stackHAORF1P = BF.openImagePlus(options)[index];
                         imgHAORF1P = tools.findBestFocus(stackHAORF1P);
                         tools.closeImage(stackHAORF1P);
 
