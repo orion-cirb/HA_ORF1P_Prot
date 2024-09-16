@@ -31,5 +31,5 @@ With each image, a *.roi* or *.zip* file can be provided containing one or multi
 
 ### Version history
 
-Version 2 released on July 17, 2023. Corrected on September 13, 2024.
+Version 2 released on July 17, 2023. Corrected on September 16, 2024.
 
